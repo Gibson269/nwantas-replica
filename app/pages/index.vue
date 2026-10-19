@@ -1,4 +1,8 @@
 <script setup lang="ts">
+definePageMeta({
+  layout: false
+})
+
 useHead({
   title: 'Nwantas | Complete School Management Platform',
   meta: [

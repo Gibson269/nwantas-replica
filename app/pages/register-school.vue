@@ -61,6 +61,16 @@ function checkSlug() {
   }, 600)
 }
 
+import { useAuthStore } from '~/stores/auth'
+import { useTenantStore } from '~/stores/tenant'
+
+definePageMeta({
+  layout: 'default'
+})
+
+const authStore = useAuthStore()
+const tenantStore = useTenantStore()
+
 function nextStep() {
   if (currentStep.value === 1) {
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
@@ -77,14 +87,34 @@ async function handleRegister() {
     return
   }
   isSubmitting.value = true
-  // Simulate database creation and tenant propagation
+  
+  // Register tenant and user in local reactive stores
   setTimeout(() => {
+    tenantStore.addSchoolTenant({
+      id: `tenant-${form.schoolSlug}`,
+      name: form.schoolName,
+      slug: form.schoolSlug,
+      motto: 'Striving for Academic Distinction & Leadership',
+      currency: form.country === 'United Kingdom' ? 'GBP' : 'NGN',
+      symbol: form.country === 'United Kingdom' ? '£' : '₦',
+      country: form.country,
+      timezone: form.country === 'United Kingdom' ? 'Europe/London' : 'Africa/Lagos',
+      planId: form.packageId as any,
+      academicYear: '2025/2026',
+      currentTerm: 'Second Term'
+    })
+
+    authStore.currentUser.name = `${form.firstName} ${form.lastName}`
+    authStore.currentUser.email = form.email
+    authStore.currentUser.role = 'school_owner'
+    authStore.currentUser.roleTitle = 'School Proprietor / Owner'
+
     isSubmitting.value = false
     registrationSuccess.value = true
     setTimeout(() => {
       navigateTo('/dashboard')
-    }, 2500)
-  }, 1500)
+    }, 2000)
+  }, 1200)
 }
 </script>
 
