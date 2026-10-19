@@ -6,6 +6,9 @@ export default defineEventHandler(async (event) => {
   const { answers, studentId, studentName } = body || {}
 
   const assessment = db.assessments.find(a => a.id === assessmentId) || db.assessments[0]
+  if (!assessment) {
+    throw createError({ statusCode: 404, statusMessage: 'Assessment not found' })
+  }
 
   let correctCount = 0
   const questionResults = assessment.questions.map(q => {

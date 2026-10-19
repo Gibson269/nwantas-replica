@@ -1,0 +1,89 @@
+# ==============================================================================
+# Nwantas Enterprise School Management Platform - Docker Compose Architecture
+# Services: Web App (Nuxt 4 / Nitro), Enterprise Database (Postgres), Cache (Redis)
+# ==============================================================================
+
+services:
+  # 1. Main Web Application (Nuxt 4 Nitro Node-Server)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nwantas_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3000
+      - DATABASE_TYPE=sqlite
+      - SQLITE_PATH=/app/.data/nwantas.db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=nwantas_production_super_secret_enterprise_key_2026
+      - DEFAULT_TENANT_ID=apex-academy
+    volumes:
+      - nwantas_sqlite_data:/app/.data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/classes"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - nwantas_network
+
+  # 2. Redis 7 (In-Memory Session Store, WebSocket Presence & CBT Cache)
+  redis:
+    image: redis:7-alpine
+    container_name: nwantas_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass nwantas_redis_secret
+    volumes:
+      - nwantas_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "nwantas_redis_secret", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nwantas_network
+
+  # 3. PostgreSQL 16 (Optional Enterprise DB for Multi-Campus Scaling)
+  db:
+    image: postgres:16-alpine
+    container_name: nwantas_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: nwantas_enterprise
+      POSTGRES_USER: nwantas_admin
+      POSTGRES_PASSWORD: nwantas_secure_password_2026
+    volumes:
+      - nwantas_pg_data:/var/lib/postgresql/data
+      - ./server/database/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nwantas_admin -d nwantas_enterprise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nwantas_network
+
+volumes:
+  nwantas_sqlite_data:
+    driver: local
+  nwantas_redis_data:
+    driver: local
+  nwantas_pg_data:
+    driver: local
+
+networks:
+  nwantas_network:
+    driver: bridge

@@ -181,7 +181,7 @@ onUnmounted(() => {
                 ? 'border-emerald-500 bg-emerald-500/15 text-white ring-2 ring-emerald-500/30'
                 : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-600 hover:bg-gray-900'
             ]"
-            @click="handleSelectOption(optIdx)"
+            @click="handleSelectOption(Number(optIdx))"
           >
             <div
               :class="[
@@ -189,7 +189,7 @@ onUnmounted(() => {
                 answers[currentQuestion.id] === optIdx ? 'bg-emerald-500 text-gray-950' : 'bg-gray-800 text-gray-400'
               ]"
             >
-              {{ String.fromCharCode(65 + optIdx) }}
+              {{ String.fromCharCode(65 + Number(optIdx)) }}
             </div>
             <span>{{ option }}</span>
           </button>
@@ -205,7 +205,7 @@ onUnmounted(() => {
             &larr; Previous Question
           </button>
           <button
-            v-if="currentQuestionIndex < (assessment?.questions.length - 1)"
+            v-if="currentQuestionIndex < ((assessment?.questions?.length || 0) - 1)"
             class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white cursor-pointer shadow-md"
             @click="currentQuestionIndex++"
           >
@@ -237,9 +237,9 @@ onUnmounted(() => {
                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40'
                 : 'bg-gray-900 text-gray-400 border border-gray-700'
             ]"
-            @click="currentQuestionIndex = idx"
+            @click="currentQuestionIndex = Number(idx)"
           >
-            {{ idx + 1 }}
+            {{ Number(idx) + 1 }}
           </button>
         </div>
 
@@ -315,7 +315,7 @@ onUnmounted(() => {
           class="p-4 rounded-2xl bg-gray-900/60 border border-gray-700 text-xs space-y-1"
         >
           <div class="flex items-center justify-between">
-            <span class="font-bold text-white">Question {{ idx + 1 }}</span>
+            <span class="font-bold text-white">Question {{ Number(idx) + 1 }}</span>
             <span :class="['font-mono font-bold text-[10px]', res.isCorrect ? 'text-emerald-400' : 'text-red-400']">
               {{ res.isCorrect ? 'CORRECT' : 'INCORRECT' }}
             </span>

@@ -14,10 +14,10 @@ export function useNwantasApi() {
       ...(options.headers || {})
     }
 
-    return $fetch<T>(endpoint, {
+    return (await $fetch(endpoint, {
       ...options,
       headers
-    })
+    })) as T
   }
 
   return {

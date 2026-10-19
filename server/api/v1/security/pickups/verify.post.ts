@@ -5,6 +5,9 @@ export default defineEventHandler(async (event) => {
   const { studentId, guardianName, guardianRelationship } = body || {}
 
   const student = db.students.find(s => s.id === studentId) || db.students[0]
+  if (!student) {
+    throw createError({ statusCode: 404, statusMessage: 'Student not found' })
+  }
 
   const newPickup: PickupRecord = {
     id: `pkp-${Date.now().toString(36)}`,

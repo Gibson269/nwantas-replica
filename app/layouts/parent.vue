@@ -79,7 +79,7 @@ function selectChild(idx: number) {
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             ]"
-            @click="selectChild(idx)"
+            @click="selectChild(Number(idx))"
           >
             <img :src="child.avatar" :alt="child.name" class="w-5 h-5 rounded-full object-cover">
             <span>{{ child.name }}</span>

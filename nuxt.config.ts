@@ -12,6 +12,15 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  typescript: {
+    strict: true,
+    tsConfig: {
+      compilerOptions: {
+        types: ['node']
+      }
+    }
+  },
+
   runtimeConfig: {
     public: {
       accountsApiV1Url: process.env.ACCOUNTS_API_V1_URL || 'https://accounts.nwantasapi.com/api/v1',

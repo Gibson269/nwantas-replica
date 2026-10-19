@@ -3,6 +3,9 @@ import { db } from '~~/server/utils/db'
 export default defineEventHandler((event) => {
   const slug = getRouterParam(event, 'slug')
   const school = db.schools.find(s => s.slug === slug || s.id === slug) || db.schools[0]
+  if (!school) {
+    throw createError({ statusCode: 404, statusMessage: 'School not found' })
+  }
 
   return {
     data: {

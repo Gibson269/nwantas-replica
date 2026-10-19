@@ -58,7 +58,7 @@ export const PRECONFIGURED_TENANTS: SchoolTenant[] = [
 ]
 
 export const useTenantStore = defineStore('tenant', () => {
-  const currentTenant = ref<SchoolTenant>(PRECONFIGURED_TENANTS[0])
+  const currentTenant = ref<SchoolTenant>(PRECONFIGURED_TENANTS[0]!)
   const isResolving = ref(false)
   const tenantError = ref<string | null>(null)
   const availableTenants = ref<SchoolTenant[]>(PRECONFIGURED_TENANTS)

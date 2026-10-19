@@ -5,6 +5,10 @@ export default defineEventHandler((event) => {
   const student = db.students.find(s => s.id === studentId) || db.students[0]
   const school = db.schools[0]
 
+  if (!student || !school) {
+    throw createError({ statusCode: 404, statusMessage: 'Student or School record not found' })
+  }
+
   const subjects = [
     { subject: 'Mathematics', ca: 19, midterm: 18, exam: 56, total: 93, grade: 'A1', remarks: 'Exceptional computational speed and reasoning.' },
     { subject: 'English Language', ca: 17, midterm: 18, exam: 50, total: 85, grade: 'A1', remarks: 'Very expressive vocabulary and essay structure.' },

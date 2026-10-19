@@ -1,7 +1,11 @@
 import { db } from '~~/server/utils/db'
 
 export default defineEventHandler(() => {
-  const school = db.schools[0]
+  const school = db.schools[0] || {
+    walletBalance: 48650000,
+    currency: 'NGN' as const,
+    symbol: '₦'
+  }
 
   return {
     wallet: {

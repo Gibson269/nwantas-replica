@@ -4,7 +4,11 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { email, role } = body || {}
 
-  const school = db.schools[0]
+  const school = db.schools[0] || {
+    id: 'apex-academy',
+    name: 'Apex International Academy',
+    slug: 'apex-academy'
+  }
 
   return {
     status: 'success',
