@@ -367,6 +367,63 @@ export const dbQuery = {
       comments
     }
   },
+  addLessonNoteComment(id: string, comment: any) {
+    const db = getDatabase()
+    const row = db.prepare('SELECT comments_json FROM lesson_notes WHERE id = ?').get(id) as any
+    if (!row) return null
+
+    const comments = JSON.parse(row.comments_json || '[]')
+    const newComment = {
+      id: comment.id || `c-${Date.now()}`,
+      author: comment.author || 'Faculty Member',
+      role: comment.role || 'Teacher',
+      text: comment.text,
+      date: comment.date || new Date().toISOString().replace('T', ' ').substring(0, 16)
+    }
+    comments.push(newComment)
+
+    db.prepare('UPDATE lesson_notes SET comments_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(JSON.stringify(comments), id)
+
+    return newComment
+  },
+  updateLessonNote(id: string, updates: any) {
+    const db = getDatabase()
+    const existing = db.prepare('SELECT * FROM lesson_notes WHERE id = ?').get(id) as any
+    if (!existing) return null
+
+    const topic = updates.topic ?? existing.topic
+    const objectives = updates.objectives ? JSON.stringify(updates.objectives) : existing.objectives_json
+    const prerequisites = updates.prerequisites ?? existing.prerequisites
+    const materials = updates.materials ? JSON.stringify(updates.materials) : existing.materials_json
+    const sections = updates.contentSections ? JSON.stringify(updates.contentSections) : existing.sections_json
+    const assessmentQuestions = updates.assessmentQuestions ? JSON.stringify(updates.assessmentQuestions) : existing.assessment_questions_json
+
+    db.prepare(`
+      UPDATE lesson_notes
+      SET topic = ?, objectives_json = ?, prerequisites = ?, materials_json = ?, sections_json = ?, assessment_questions_json = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(topic, objectives, prerequisites, materials, sections, assessmentQuestions, id)
+
+    const updated = db.prepare('SELECT * FROM lesson_notes WHERE id = ?').get(id) as any
+    return {
+      ...updated,
+      classLevel: updated.class_level,
+      authorRole: updated.author_role,
+      objectives: JSON.parse(updated.objectives_json || '[]'),
+      materials: JSON.parse(updated.materials_json || '[]'),
+      contentSections: JSON.parse(updated.sections_json || '[]'),
+      assessmentQuestions: JSON.parse(updated.assessment_questions_json || '[]'),
+      comments: JSON.parse(updated.comments_json || '[]'),
+      createdAt: updated.created_at,
+      updatedAt: updated.updated_at
+    }
+  },
+  deleteLessonNote(id: string) {
+    const db = getDatabase()
+    db.prepare('DELETE FROM lesson_notes WHERE id = ?').run(id)
+    return { success: true, id }
+  },
 
   // 6. Assessments & CBT Engine
   getAssessments(tenantId = 'apex-academy') {

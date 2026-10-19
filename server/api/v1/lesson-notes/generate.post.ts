@@ -1,74 +1,91 @@
-import { db, type LessonNoteRecord } from '~~/server/utils/db'
+import { dbQuery } from '~~/server/database'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { subject, topic, classLevel, duration, pedagogicalFocus } = body || {}
+  const tenantId = (getHeader(event, 'x-tenant-id') as string) || 'apex-academy'
+  const { subject, topic, classLevel, duration, pedagogicalFocus, curriculumStandard } = body || {}
 
-  const newNote: LessonNoteRecord = {
-    id: `ln-${Date.now().toString(36)}`,
-    schoolId: 'apex-academy',
-    subject: subject || 'Physics',
-    topic: topic || 'Quantum Duality & Photoelectric Effect',
-    classLevel: classLevel || 'SS 3 Science',
+  const subj = subject || 'Physics'
+  const top = topic || 'Electromagnetic Induction & Faraday\'s Laws'
+  const lvl = classLevel || 'SS 2 Science'
+  const dur = duration || '80 Minutes (Double Period)'
+  const focus = pedagogicalFocus || 'Bloom\'s Analysis & Laboratory Discovery'
+  const standard = curriculumStandard || 'NERDC / Cambridge Dual Alignment'
+
+  // Generate subject-aligned objectives & sections
+  const objectives = [
+    `Analyze the core theoretical principles of ${top} in alignment with ${standard} benchmarks. [Bloom: Analyzing]`,
+    `Apply fundamental equations and calculate numerical solutions with appropriate physical or dimensional units. [Bloom: Applying]`,
+    `Investigate practical real-world applications and identify common misconceptions through diagnostic inquiry. [Bloom: Evaluating]`
+  ]
+
+  const prerequisites = `Solid working foundation in foundational ${subj} concepts, algebraic notation, and laboratory safety protocols.`
+
+  const materials = [
+    'Interactive Smartboard with PhET / Digital STEM Simulator',
+    'Demonstration laboratory apparatus & physical models',
+    'Structured student inquiry worksheet with diagnostic speed drills',
+    `Senior Secondary ${subj} Approved Textbook (NERDC / Cambridge Edition)`
+  ]
+
+  const contentSections = [
+    {
+      title: 'Phase 1: Engagement & Prior Knowledge Activation (15 mins)',
+      body: `Pose an intriguing real-world challenge related to ${top}. Connect a physical or virtual demonstration and guide students to form testable hypotheses. Record divergent student perspectives on the board without validating or dismissing any.`
+    },
+    {
+      title: 'Phase 2: Explicit Conceptual Exposition & Mathematical Derivation (25 mins)',
+      body: `Formulate the governing definitions, theoretical laws, and mathematical equations governing ${top}. Work through two past examination questions step-by-step, highlighting common examiner traps and showing full calculation steps.`
+    },
+    {
+      title: 'Phase 3: Collaborative Inquiry & Hands-On Investigation (25 mins)',
+      body: `Transition students into collaborative paired pods. Distribute inquiry worksheets where students manipulate variables, measure empirical results, and cross-examine findings against theoretical expectations.`
+    },
+    {
+      title: 'Phase 4: Plenary Reflection, Formative Check & Exit Ticket (15 mins)',
+      body: `Conduct a rapid exit-ticket diagnostic quiz. Call on three divergent pairs to defend their analytical conclusions. Summarize the key curriculum takeaways and assign practice homework from the past question bank.`
+    }
+  ]
+
+  const assessmentQuestions = [
+    `Explain the scientific rationale behind ${top} and cite two contemporary industrial applications.`,
+    `Calculate the unknown dependent variable given standard experimental parameters under normal laboratory conditions.`,
+    `How would changing the primary boundary condition affect the observed physical or empirical outcome?`
+  ]
+
+  const comments = [
+    {
+      id: `c-${Date.now()}`,
+      author: 'AI Curriculum Engine',
+      role: 'Automated Pedagogical Validator',
+      text: `Generated according to ${standard} with pedagogical emphasis on ${focus}. Ready for teacher personalization and departmental HOD submission.`,
+      date: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    }
+  ]
+
+  const noteId = `ln-${Date.now().toString(36)}`
+  const newNote = dbQuery.insertLessonNote({
+    id: noteId,
+    tenantId,
+    subject: subj,
+    topic: top,
+    classLevel: lvl,
     term: 'Second Term',
-    week: 5,
-    author: 'AI Curriculum Engine (on behalf of Form Teacher)',
-    authorRole: 'AI Assistant & Subject Specialist',
+    week: Math.floor(1 + Math.random() * 11),
+    author: 'AI Curriculum Specialist (on behalf of Form Faculty)',
+    authorRole: 'Curriculum & Pedagogy Specialist',
     status: 'Draft',
-    objectives: [
-      `Analyze the fundamental principles of ${topic || 'the topic'} in accordance with NERDC / Cambridge curriculum standards.`,
-      `Demonstrate practical calculations and identify common misconceptions.`,
-      `Evaluate student understanding through continuous assessment diagnostic questions.`
-    ],
-    prerequisites: `Basic foundation in ${subject || 'the subject'}, algebra, and laboratory safety protocols.`,
-    materials: [
-      'Interactive Smartboard / PhET Simulation module',
-      'Laboratory apparatus and demonstration setup',
-      'Student study worksheet with practice questions',
-      'Reference Textbook: Chapter 8'
-    ],
-    contentSections: [
-      {
-        title: 'Section 1: Engaging Hook & Prior Knowledge Activation (10 mins)',
-        body: `Begin with an intriguing real-world phenomenon illustrating ${topic}. Pose an open-ended diagnostic question to activate prior schema and record initial hypotheses on the board.`
-      },
-      {
-        title: 'Section 2: Core Concept Exposition & Mathematical Formulation (25 mins)',
-        body: `Deconstruct the theoretical principles. Define key formulas, dimensional units, and physical laws. Walk through two high-frequency exam examples step-by-step with student participation.`
-      },
-      {
-        title: 'Section 3: Collaborative Inquiry & Practical Application (30 mins)',
-        body: `Organize students into small laboratory groups. Provide guided experimental tasks where students observe variables, record empirical measurements, and plot corresponding graphs.`
-      },
-      {
-        title: 'Section 4: Formative Plenary & Wrap-up Reflection (15 mins)',
-        body: `Conduct a rapid exit-ticket quiz. Synthesize key takeaways and assign homework practice problems to consolidate learning.`
-      }
-    ],
-    assessmentQuestions: [
-      `Explain two practical applications of ${topic} in contemporary technology.`,
-      `Solve for the unknown variable given standard atmospheric temperature and pressure parameters.`,
-      `Differentiate between experimental observations and classical theoretical predictions.`
-    ],
-    comments: [
-      {
-        id: `c-${Date.now()}`,
-        author: 'AI Curriculum Validator',
-        role: 'AI System',
-        text: `Generated according to Senior Secondary Bloom's Taxonomy criteria with pedagogical focus on ${pedagogicalFocus || 'conceptual rigor and hands-on investigation'}.`,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16)
-      }
-    ],
-    createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-    updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
-  }
-
-  // Prepend to database
-  db.lessonNotes.unshift(newNote)
+    objectives,
+    prerequisites,
+    materials,
+    contentSections,
+    assessmentQuestions,
+    comments
+  })
 
   return {
     success: true,
+    message: `Pedagogical lesson note for ${top} generated successfully`,
     data: newNote
   }
 })
-
