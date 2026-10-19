@@ -2,17 +2,78 @@
 @import "@nuxt/ui";
 
 @theme static {
-  --font-sans: 'Public Sans', sans-serif;
+  --font-sans: 'Public Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-display: 'Public Sans', system-ui, sans-serif;
 
-  --color-green-50: #EFFDF5;
-  --color-green-100: #D9FBE8;
-  --color-green-200: #B3F5D1;
-  --color-green-300: #75EDAE;
-  --color-green-400: #00DC82;
-  --color-green-500: #00C16A;
-  --color-green-600: #00A155;
-  --color-green-700: #007F45;
-  --color-green-800: #016538;
-  --color-green-900: #0A5331;
-  --color-green-950: #052E16;
+  --color-primary-50: oklch(98.2% 0.018 155.826);
+  --color-primary-100: oklch(96.2% 0.044 156.743);
+  --color-primary-200: oklch(92.5% 0.084 155.995);
+  --color-primary-300: oklch(87.1% 0.15 154.449);
+  --color-primary-400: oklch(79.2% 0.209 151.711);
+  --color-primary-500: oklch(72.3% 0.219 149.579);
+  --color-primary-600: oklch(62.7% 0.194 149.214);
+  --color-primary-700: oklch(52.7% 0.154 150.069);
+  --color-primary-800: oklch(44.8% 0.119 151.328);
+  --color-primary-900: oklch(39.3% 0.095 152.535);
+  --color-primary-950: oklch(26.6% 0.065 152.934);
+
+  --color-secondary-50: oklch(97% 0.014 254.604);
+  --color-secondary-100: oklch(93.2% 0.032 255.585);
+  --color-secondary-200: oklch(88.2% 0.059 254.128);
+  --color-secondary-300: oklch(80.9% 0.105 251.813);
+  --color-secondary-400: oklch(70.7% 0.165 254.624);
+  --color-secondary-500: oklch(62.3% 0.214 259.815);
+  --color-secondary-600: oklch(54.6% 0.245 262.881);
+  --color-secondary-700: oklch(48.8% 0.243 264.376);
+  --color-secondary-800: oklch(42.4% 0.199 265.638);
+  --color-secondary-900: oklch(37.9% 0.146 265.522);
+  --color-secondary-950: oklch(28.2% 0.091 267.935);
+}
+
+:root {
+  --primary-green: #00c16a;
+  --secondary-green: #00a155;
+  --bg-dark: #111111;
+  --bg-card: #ffffff;
+  --text-muted: #787774;
+}
+
+/* Aurora Glow Animation */
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+.aurora-1 {
+  width: 700px;
+  height: 700px;
+  top: -180px;
+  left: -120px;
+  background: radial-gradient(circle, #a8d5b8 0%, #c8ebd5 50%, transparent 80%);
+  opacity: 0.55;
+  animation: aurora-drift-1 22s ease-in-out infinite;
+}
+
+.aurora-2 {
+  width: 600px;
+  height: 600px;
+  bottom: -140px;
+  right: -80px;
+  background: radial-gradient(circle, #b5dfc6 0%, #d4eedd 50%, transparent 80%);
+  opacity: 0.45;
+  animation: aurora-drift-2 28s ease-in-out infinite;
+}
+
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translate(0) scale(1); }
+  33% { transform: translate(30px, -40px) scale(1.08); }
+  66% { transform: translate(-20px, 25px) scale(0.95); }
+}
+
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translate(0) scale(1); }
+  40% { transform: translate(-35px, 20px) scale(1.06); }
+  70% { transform: translate(15px, -30px) scale(0.97); }
 }
