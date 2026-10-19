@@ -1,9 +1,11 @@
-import { db } from '~~/server/utils/db'
+import { database } from '~~/server/database'
 
 export default defineEventHandler(() => {
+  const data = database.getAssessments()
   return {
-    data: db.assessments,
-    total: db.assessments.length
+    data,
+    total: data.length
   }
 })
+
 

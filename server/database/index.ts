@@ -428,7 +428,7 @@ export const dbQuery = {
   // 6. Assessments & CBT Engine
   getAssessments(tenantId = 'apex-academy') {
     const db = getDatabase()
-    const rows = db.prepare('SELECT * FROM assessments WHERE tenant_id = ?').all(tenantId) as any[]
+    const rows = db.prepare('SELECT * FROM assessments WHERE tenant_id = ? ORDER BY created_at DESC').all(tenantId) as any[]
     return rows.map(r => ({
       ...r,
       classLevel: r.class_level,
@@ -438,7 +438,8 @@ export const dbQuery = {
       isPublished: Boolean(r.is_published),
       submissionsCount: r.submissions_count,
       averageScore: r.average_score,
-      questions: JSON.parse(r.questions_json || '[]')
+      questions: JSON.parse(r.questions_json || '[]'),
+      createdAt: r.created_at
     }))
   },
   getAssessmentById(id: string) {
@@ -454,24 +455,182 @@ export const dbQuery = {
       isPublished: Boolean(r.is_published),
       submissionsCount: r.submissions_count,
       averageScore: r.average_score,
-      questions: JSON.parse(r.questions_json || '[]')
+      questions: JSON.parse(r.questions_json || '[]'),
+      createdAt: r.created_at
     }
+  },
+  createAssessment(data: any) {
+    const db = getDatabase()
+    const id = data.id || `asm-${Date.now().toString(36)}`
+    const tenantId = data.tenantId || 'apex-academy'
+    const title = data.title || 'Untitled Assessment'
+    const type = data.type || 'CBT Exam'
+    const subject = data.subject || 'General Studies'
+    const classLevel = data.classLevel || 'SS 1'
+    const durationMinutes = Number(data.durationMinutes) || 45
+    const totalMarks = Number(data.totalMarks) || 40
+    const instructions = data.instructions || 'Answer all questions carefully within the allocated time.'
+    const antiCheatEnabled = data.antiCheatEnabled !== false ? 1 : 0
+    const isPublished = data.isPublished !== false ? 1 : 0
+    const questionsJson = JSON.stringify(data.questions || [])
+    const submissionsCount = 0
+    const averageScore = 0
+
+    db.prepare(`
+      INSERT INTO assessments (
+        id, tenant_id, title, type, subject, class_level, duration_minutes,
+        total_marks, instructions, anti_cheat_enabled, is_published,
+        questions_json, submissions_count, average_score
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, tenantId, title, type, subject, classLevel, durationMinutes,
+      totalMarks, instructions, antiCheatEnabled, isPublished,
+      questionsJson, submissionsCount, averageScore
+    )
+
+    return this.getAssessmentById(id)
+  },
+  updateAssessment(id: string, updates: any) {
+    const db = getDatabase()
+    const existing = db.prepare('SELECT * FROM assessments WHERE id = ?').get(id) as any
+    if (!existing) return null
+
+    const title = updates.title ?? existing.title
+    const type = updates.type ?? existing.type
+    const subject = updates.subject ?? existing.subject
+    const classLevel = updates.classLevel ?? existing.class_level
+    const durationMinutes = updates.durationMinutes !== undefined ? Number(updates.durationMinutes) : existing.duration_minutes
+    const totalMarks = updates.totalMarks !== undefined ? Number(updates.totalMarks) : existing.total_marks
+    const instructions = updates.instructions ?? existing.instructions
+    const antiCheatEnabled = updates.antiCheatEnabled !== undefined ? (updates.antiCheatEnabled ? 1 : 0) : existing.anti_cheat_enabled
+    const isPublished = updates.isPublished !== undefined ? (updates.isPublished ? 1 : 0) : existing.is_published
+    const questionsJson = updates.questions ? JSON.stringify(updates.questions) : existing.questions_json
+
+    db.prepare(`
+      UPDATE assessments SET
+        title = ?,
+        type = ?,
+        subject = ?,
+        class_level = ?,
+        duration_minutes = ?,
+        total_marks = ?,
+        instructions = ?,
+        anti_cheat_enabled = ?,
+        is_published = ?,
+        questions_json = ?
+      WHERE id = ?
+    `).run(
+      title, type, subject, classLevel, durationMinutes, totalMarks,
+      instructions, antiCheatEnabled, isPublished, questionsJson, id
+    )
+
+    return this.getAssessmentById(id)
+  },
+  deleteAssessment(id: string) {
+    const db = getDatabase()
+    db.prepare('DELETE FROM anti_cheat_events WHERE assessment_id = ?').run(id)
+    db.prepare('DELETE FROM assessment_submissions WHERE assessment_id = ?').run(id)
+    db.prepare('DELETE FROM assessments WHERE id = ?').run(id)
+    return { success: true, id }
+  },
+  recordAssessmentSubmission(submission: any) {
+    const db = getDatabase()
+    const id = submission.id || `sub-${Date.now().toString(36)}`
+    const assessmentId = submission.assessmentId
+    const studentId = submission.studentId || 'usr-stud-01'
+    const studentName = submission.studentName || 'Student Candidate'
+    const score = Number(submission.score) || 0
+    const totalMarks = Number(submission.totalMarks) || 40
+    const percentage = Number(submission.percentage) || 0
+    const passed = submission.passed ? 1 : 0
+    const resultsJson = JSON.stringify(submission.results || submission.questionResults || [])
+    const submittedAt = submission.submittedAt || new Date().toISOString().replace('T', ' ').substring(0, 19)
+
+    db.prepare(`
+      INSERT INTO assessment_submissions (
+        id, assessment_id, student_id, student_name, score, total_marks,
+        percentage, passed, results_json, submitted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, assessmentId, studentId, studentName, score, totalMarks,
+      percentage, passed, resultsJson, submittedAt
+    )
+
+    // Recalculate metrics for the assessment
+    const stats = db.prepare(`
+      SELECT COUNT(*) as cnt, AVG(score) as avg_score
+      FROM assessment_submissions
+      WHERE assessment_id = ?
+    `).get(assessmentId) as { cnt: number; avg_score: number | null }
+
+    const submissionsCount = stats?.cnt || 1
+    const averageScore = Math.round((stats?.avg_score || score) * 10) / 10
+
+    db.prepare(`
+      UPDATE assessments
+      SET submissions_count = ?, average_score = ?
+      WHERE id = ?
+    `).run(submissionsCount, averageScore, assessmentId)
+
+    return {
+      id,
+      assessmentId,
+      studentId,
+      studentName,
+      score,
+      totalMarks,
+      percentage,
+      passed: Boolean(passed),
+      questionResults: JSON.parse(resultsJson),
+      submittedAt
+    }
+  },
+  getAssessmentSubmissions(assessmentId: string) {
+    const db = getDatabase()
+    const rows = db.prepare(`
+      SELECT * FROM assessment_submissions
+      WHERE assessment_id = ?
+      ORDER BY submitted_at DESC
+    `).all(assessmentId) as any[]
+
+    return rows.map(r => ({
+      id: r.id,
+      assessmentId: r.assessment_id,
+      studentId: r.student_id,
+      studentName: r.student_name,
+      score: r.score,
+      totalMarks: r.total_marks,
+      percentage: r.percentage,
+      passed: Boolean(r.passed),
+      results: JSON.parse(r.results_json || '[]'),
+      submittedAt: r.submitted_at
+    }))
   },
   recordAntiCheatEvent(event: any) {
     const db = getDatabase()
+    const id = event.id || `ace-${Date.now().toString(36)}`
+    const timestamp = event.timestamp || new Date().toISOString().replace('T', ' ').substring(0, 19)
     db.prepare(`
       INSERT INTO anti_cheat_events (id, assessment_id, student_id, student_name, event_type, details, timestamp)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
-      event.id,
+      id,
       event.assessmentId,
       event.studentId,
       event.studentName,
       event.eventType,
       event.details,
-      event.timestamp || new Date().toISOString().replace('T', ' ').substring(0, 19)
+      timestamp
     )
-    return event
+    return {
+      id,
+      assessmentId: event.assessmentId,
+      studentId: event.studentId,
+      studentName: event.studentName,
+      eventType: event.eventType,
+      details: event.details,
+      timestamp
+    }
   },
   getAntiCheatEvents(assessmentId?: string) {
     const db = getDatabase()
@@ -481,8 +640,13 @@ export const dbQuery = {
       query += ' WHERE assessment_id = ?'
       params.push(assessmentId)
     }
-    query += ' ORDER BY timestamp DESC'
+    query += ' ORDER BY timestamp DESC LIMIT 50'
     return db.prepare(query).all(...params)
+  },
+  clearAntiCheatEvent(eventId: string) {
+    const db = getDatabase()
+    db.prepare('DELETE FROM anti_cheat_events WHERE id = ?').run(eventId)
+    return { success: true, id: eventId }
   },
 
   // 7. Broadsheet & Gradebook
@@ -766,3 +930,7 @@ export const dbQuery = {
     }
   }
 }
+
+export const database = dbQuery
+export default dbQuery
+

@@ -63,7 +63,7 @@ export function resetDatabase(): DatabaseSync {
 export function seedInitialData(db: DatabaseSync) {
   // 1. Multi-Tenant Institutions
   const insertTenant = db.prepare(`
-    INSERT INTO tenants (id, name, slug, motto, currency, symbol, address, country, email, phone, plan_id, wallet_balance)
+    INSERT OR REPLACE INTO tenants (id, name, slug, motto, currency, symbol, address, country, email, phone, plan_id, wallet_balance)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertTenant.run('apex-academy', 'Apex International Academy', 'apex-academy', 'Excellence, Character & Global Leadership', 'NGN', '₦', 'Plot 14 Admiralty Way, Lekki Phase 1, Lagos State', 'Nigeria', 'admissions@apexacademy.edu.ng', '+234 1 800 2739', 'school_plus', 48650000)
@@ -71,7 +71,7 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 2. Users & RBAC Personas
   const insertUser = db.prepare(`
-    INSERT INTO users (id, tenant_id, name, email, role, role_title, avatar, permissions_json)
+    INSERT OR REPLACE INTO users (id, tenant_id, name, email, role, role_title, avatar, permissions_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const personas = [
@@ -93,7 +93,7 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 3. Classes
   const insertClass = db.prepare(`
-    INSERT INTO classes (id, tenant_id, level, arm, display_name, form_teacher, student_count, capacity, subjects_json)
+    INSERT OR REPLACE INTO classes (id, tenant_id, level, arm, display_name, form_teacher, student_count, capacity, subjects_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertClass.run('cls-jss1-gold', 'apex-academy', 'JSS 1', 'Gold', 'JSS 1 Gold', 'Mrs. Chioma Eze', 32, 35, JSON.stringify(['Mathematics', 'English Language', 'Basic Science', 'Social Studies', 'Civic Education']))
@@ -103,7 +103,7 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 4. Students
   const insertStudent = db.prepare(`
-    INSERT INTO students (id, tenant_id, admission_no, name, class_arm_id, class_arm_name, gender, date_of_birth, guardian_name, guardian_phone, guardian_email, guardian_relationship, guardian_photo, avatar, attendance_rate, fee_status, fee_amount_due, hostel_building, hostel_room, hostel_bed)
+    INSERT OR REPLACE INTO students (id, tenant_id, admission_no, name, class_arm_id, class_arm_name, gender, date_of_birth, guardian_name, guardian_phone, guardian_email, guardian_relationship, guardian_photo, avatar, attendance_rate, fee_status, fee_amount_due, hostel_building, hostel_room, hostel_bed)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertStudent.run('usr-stud-01', 'apex-academy', 'APX-2023-084', 'Chidi Okonkwo', 'cls-ss2-sci', 'SS 2 Science', 'Male', '2009-04-12', 'Dr. Kenneth Okonkwo', '+234 803 555 1234', 'k.okonkwo@family.org', 'Father', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', 98.5, 'Paid in Full', 0, 'Nelson Mandela Hall', 'Room 204', 'Bed B')
@@ -113,7 +113,7 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 5. Lesson Notes
   const insertNote = db.prepare(`
-    INSERT INTO lesson_notes (id, tenant_id, subject, topic, class_level, term, week, author, author_role, status, objectives_json, prerequisites, materials_json, sections_json, assessment_questions_json, comments_json)
+    INSERT OR REPLACE INTO lesson_notes (id, tenant_id, subject, topic, class_level, term, week, author, author_role, status, objectives_json, prerequisites, materials_json, sections_json, assessment_questions_json, comments_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertNote.run(
@@ -141,7 +141,7 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 6. Assessments
   const insertAssessment = db.prepare(`
-    INSERT INTO assessments (id, tenant_id, title, type, subject, class_level, duration_minutes, total_marks, instructions, anti_cheat_enabled, is_published, questions_json, submissions_count, average_score)
+    INSERT OR REPLACE INTO assessments (id, tenant_id, title, type, subject, class_level, duration_minutes, total_marks, instructions, anti_cheat_enabled, is_published, questions_json, submissions_count, average_score)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertAssessment.run(
@@ -166,46 +166,110 @@ export function seedInitialData(db: DatabaseSync) {
     32.5
   )
 
+  insertAssessment.run(
+    'asm-cbt-02',
+    'apex-academy',
+    'SS 3 Further Mathematics WAEC Prep Mock',
+    'Mock WAEC/JAMB',
+    'Mathematics',
+    'SS 3 Science',
+    60,
+    50,
+    'Strict anti-cheat proctoring enabled. Non-programmable virtual on-screen scratchpad provided.',
+    1,
+    1,
+    JSON.stringify([
+      { id: 'q-201', questionText: 'Evaluate the limit as x approaches 0 of sin(5x) / x:', options: ['0', '1', '5', 'Undefined'], correctIndex: 2, explanation: 'lim(x->0) [sin(kx)/x] = k. Here k = 5.' },
+      { id: 'q-202', questionText: 'If the matrix A = [[2, 3], [1, 4]], find the determinant det(A):', options: ['5', '8', '11', '14'], correctIndex: 0, explanation: 'det(A) = (2 * 4) - (3 * 1) = 8 - 3 = 5.' },
+      { id: 'q-203', questionText: 'Differentiate y = e^(3x^2) with respect to x:', options: ['6x * e^(3x^2)', '3x * e^(3x^2)', 'e^(6x)', '6 * e^(3x)'], correctIndex: 0, explanation: 'By chain rule: dy/dx = d(3x^2)/dx * e^(3x^2) = 6x * e^(3x^2).' },
+      { id: 'q-204', questionText: 'What is the standard deviation of the numbers 4, 4, 4, 4, 4?', options: ['4', '2', '0', '1'], correctIndex: 2, explanation: 'All values are identical, hence zero variance and zero standard deviation.' }
+    ]),
+    18,
+    41.2
+  )
+
+  insertAssessment.run(
+    'asm-cbt-03',
+    'apex-academy',
+    'JSS 1 English Lexis and Structure Quiz',
+    'Weekly Quiz',
+    'English Language',
+    'JSS 1 Gold',
+    30,
+    20,
+    'Read each passage sentence carefully and select the grammatically appropriate preposition or tense.',
+    1,
+    1,
+    JSON.stringify([
+      { id: 'q-301', questionText: 'Neither the teacher nor the students _____ present at the assembly yesterday.', options: ['was', 'were', 'is', 'are'], correctIndex: 1, explanation: 'By proximity rule with neither/nor, the verb agrees with the closer plural subject "students".' },
+      { id: 'q-302', questionText: 'Choose the antonym of the word "ARROGANT":', options: ['Proud', 'Humble', 'Courageous', 'Boastful'], correctIndex: 1, explanation: 'Humble is the exact opposite of arrogant.' },
+      { id: 'q-303', questionText: 'The committee has submitted _____ official recommendation.', options: ['their', 'its', 'theirs', 'there'], correctIndex: 1, explanation: 'Committee acts as a singular collective noun here.' }
+    ]),
+    32,
+    16.8
+  )
+
   // 7. Anti-Cheat Events
   const insertEvent = db.prepare(`
-    INSERT INTO anti_cheat_events (id, assessment_id, student_id, student_name, event_type, details, timestamp)
+    INSERT OR REPLACE INTO anti_cheat_events (id, assessment_id, student_id, student_name, event_type, details, timestamp)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
   insertEvent.run('ace-001', 'asm-cbt-01', 'usr-stud-04', 'David Adeleke Jr.', 'tab_switch', 'Switched away from examination tab for 4.2 seconds.', '2026-10-19 10:14:22')
+  insertEvent.run('ace-002', 'asm-cbt-01', 'usr-stud-02', 'Tobi Bakare', 'copy_paste_attempt', 'Attempted unauthorized text copy from examination canvas (Ctrl+C intercepted).', '2026-10-19 10:22:05')
+  insertEvent.run('ace-003', 'asm-cbt-03', 'usr-stud-03', 'Fatima Sanusi', 'fullscreen_exit', 'Candidate exited fullscreen mode. Automated security warning triggered.', '2026-10-19 09:48:11')
+  insertEvent.run('ace-004', 'asm-cbt-02', 'usr-stud-01', 'Emeka Eze', 'window_blur', 'Window blur detected: Candidate unfocused the active test viewport.', '2026-10-19 11:05:43')
+
+  // 8. Assessment Submissions
+  const insertSub = db.prepare(`
+    INSERT OR REPLACE INTO assessment_submissions (id, assessment_id, student_id, student_name, score, total_marks, percentage, passed, results_json, submitted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  insertSub.run('sub-001', 'asm-cbt-01', 'usr-stud-04', 'David Adeleke Jr.', 30, 40, 75.0, 1, JSON.stringify([
+    { questionId: 'q-1', selected: 0, correctIndex: 0, isCorrect: true },
+    { questionId: 'q-2', selected: 1, correctIndex: 1, isCorrect: true },
+    { questionId: 'q-3', selected: 1, correctIndex: 1, isCorrect: true },
+    { questionId: 'q-4', selected: 0, correctIndex: 2, isCorrect: false }
+  ]), '2026-10-19 10:45:00')
+  insertSub.run('sub-002', 'asm-cbt-01', 'usr-stud-02', 'Amina Bello', 40, 40, 100.0, 1, JSON.stringify([
+    { questionId: 'q-1', selected: 0, correctIndex: 0, isCorrect: true },
+    { questionId: 'q-2', selected: 1, correctIndex: 1, isCorrect: true },
+    { questionId: 'q-3', selected: 1, correctIndex: 1, isCorrect: true },
+    { questionId: 'q-4', selected: 2, correctIndex: 2, isCorrect: true }
+  ]), '2026-10-19 10:42:15')
 
   // 8. Broadsheet & Gradebook Entries
   const insertGrade = db.prepare(`
-    INSERT INTO gradebook_entries (id, tenant_id, student_id, student_name, admission_no, class_arm_id, subject_name, ca_score, midterm_score, exam_score, total_score, letter_grade, gpa, position, teacher_remarks, principal_remarks)
+    INSERT OR REPLACE INTO gradebook_entries (id, tenant_id, student_id, student_name, admission_no, class_arm_id, subject_name, ca_score, midterm_score, exam_score, total_score, letter_grade, gpa, position, teacher_remarks, principal_remarks)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertGrade.run('gb-001', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'APX-2023-084', 'cls-ss2-sci', 'Physics', 19, 18, 54, 91, 'A1', 5.0, 1, 'Exceptional mastery of physical concepts and mathematical reasoning.', 'Outstanding result. Keep sustaining this academic distinction.')
   insertGrade.run('gb-002', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'Physics', 18, 17, 51, 86, 'A1', 5.0, 2, 'Brilliant analytical problem solver and active classroom contributor.', 'Commendable performance.')
 
   // 9. Wallets, Transactions & Fee Schedules
-  const insertFee = db.prepare(`INSERT INTO fee_schedules (id, tenant_id, title, amount, category) VALUES (?, ?, ?, ?, ?)`)
+  const insertFee = db.prepare(`INSERT OR REPLACE INTO fee_schedules (id, tenant_id, title, amount, category) VALUES (?, ?, ?, ?, ?)`)
   insertFee.run('fee-01', 'apex-academy', 'Senior Secondary Tuition (Term 2)', 350000, 'Mandatory')
   insertFee.run('fee-02', 'apex-academy', 'STEM & Robotics Lab Levy', 45000, 'Mandatory')
   insertFee.run('fee-03', 'apex-academy', 'Full Boarding & Hostel Maintenance', 280000, 'Optional (Boarders)')
   insertFee.run('fee-04', 'apex-academy', 'PTA Development Levy', 15000, 'Mandatory')
 
-  const insertTx = db.prepare(`INSERT INTO transactions (id, tenant_id, student_name, type, amount, channel, status, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+  const insertTx = db.prepare(`INSERT OR REPLACE INTO transactions (id, tenant_id, student_name, type, amount, channel, status, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
   insertTx.run('tx-001', 'apex-academy', 'Chidi Okonkwo', 'Tuition Fee Payment', 395000, 'Paystack Direct Debit', 'Success', '2026-10-18')
   insertTx.run('tx-002', 'apex-academy', 'Adaeze Okonkwo', 'Tuition Instalment 1', 200000, 'Hosted Payment Link', 'Success', '2026-10-17')
   insertTx.run('tx-003', 'apex-academy', 'Amina Bello', 'Tuition & Boarding Fee', 675000, 'Flutterwave Card', 'Success', '2026-10-15')
 
   const insertPayroll = db.prepare(`
-    INSERT INTO payroll_runs (id, tenant_id, month, total_staff, gross_salary, deductions, net_disbursement, status, disbursed_date, approved_by)
+    INSERT OR REPLACE INTO payroll_runs (id, tenant_id, month, total_staff, gross_salary, deductions, net_disbursement, status, disbursed_date, approved_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertPayroll.run('pr-2026-09', 'apex-academy', 'September 2026', 86, 18450000, 2150000, 16300000, 'Disbursed', '2026-09-28', 'Chief Anthony Balogun (Owner)')
   insertPayroll.run('pr-2026-10', 'apex-academy', 'October 2026', 86, 18450000, 2150000, 16300000, 'Ready for Review', null, null)
 
   // 10. Hostel Buildings & Beds
-  const insertHostel = db.prepare(`INSERT INTO hostel_buildings (id, tenant_id, name, warden, total_rooms, total_beds, occupied_beds, vacant_beds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+  const insertHostel = db.prepare(`INSERT OR REPLACE INTO hostel_buildings (id, tenant_id, name, warden, total_rooms, total_beds, occupied_beds, vacant_beds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
   insertHostel.run('bld-01', 'apex-academy', 'Nelson Mandela Hall (Boys Senior Boarding)', 'Mr. Jude Okafor', 24, 96, 82, 14)
   insertHostel.run('bld-02', 'apex-academy', 'Queen Amina Hostel (Girls Senior Boarding)', 'Mrs. Grace Danjuma', 24, 96, 88, 8)
 
-  const insertBed = db.prepare(`INSERT INTO hostel_beds (id, building_id, building_name, room_number, bed_code, status, student_name, student_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+  const insertBed = db.prepare(`INSERT OR REPLACE INTO hostel_beds (id, building_id, building_name, room_number, bed_code, status, student_name, student_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
   insertBed.run('b-01', 'bld-01', 'Nelson Mandela Hall', 'Room 204', 'Bed A', 'Vacant', null, null)
   insertBed.run('b-02', 'bld-01', 'Nelson Mandela Hall', 'Room 204', 'Bed B', 'Occupied', 'Chidi Okonkwo', 'usr-stud-01')
   insertBed.run('b-03', 'bld-02', 'Queen Amina Hostel', 'Room 102', 'Bed A', 'Occupied', 'Adaeze Okonkwo', 'usr-stud-02')
@@ -213,26 +277,26 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 11. Campus Gate Security, Exeats & Pickups
   const insertExeat = db.prepare(`
-    INSERT INTO exeats (id, tenant_id, student_id, student_name, class_arm, type, departure_time, expected_return, status, approved_by, guardian_pickup_name)
+    INSERT OR REPLACE INTO exeats (id, tenant_id, student_id, student_name, class_arm, type, departure_time, expected_return, status, approved_by, guardian_pickup_name)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertExeat.run('ext-101', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'SS 2 Science', 'Weekend Exeat', '2026-10-19 15:30', '2026-10-21 17:00', 'Approved', 'Mrs. Folake Adeyemi (Admin)', 'Dr. Kenneth Okonkwo')
   insertExeat.run('ext-102', 'apex-academy', 'usr-stud-04', 'David Adeleke Jr.', 'JSS 2 Diamond', 'Medical', '2026-10-19 11:00', '2026-10-19 16:00', 'Departed', 'Dr. Chukwuemeka Eze (Principal)', 'Mr. David Adeleke Sr.')
 
   const insertPickup = db.prepare(`
-    INSERT INTO guardian_pickups (id, tenant_id, student_id, student_name, class_arm, guardian_name, guardian_relationship, guardian_photo, pickup_date, status, verified_by)
+    INSERT OR REPLACE INTO guardian_pickups (id, tenant_id, student_id, student_name, class_arm, guardian_name, guardian_relationship, guardian_photo, pickup_date, status, verified_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertPickup.run('pkp-01', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'SS 2 Science', 'Dr. Kenneth Okonkwo', 'Father', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', '2026-10-19 11:15 AM', 'Verified & Cleared', 'Officer Samuel Mensah (Gate 1)')
 
   // 12. Chat Rooms & Messages
-  const insertChatRoom = db.prepare(`INSERT INTO chat_rooms (id, tenant_id, name, type, description, unread_count) VALUES (?, ?, ?, ?, ?, ?)`)
+  const insertChatRoom = db.prepare(`INSERT OR REPLACE INTO chat_rooms (id, tenant_id, name, type, description, unread_count) VALUES (?, ?, ?, ?, ?, ?)`)
   insertChatRoom.run('rm-staff-general', 'apex-academy', 'All Academic Staff', 'group', 'Institutional announcements and academic coordination', 2)
   insertChatRoom.run('rm-science-dept', 'apex-academy', 'Science & Mathematics Faculty', 'group', 'STEM coordination and laboratory setups', 0)
   insertChatRoom.run('rm-parents-ss2', 'apex-academy', 'SS 2 Parents & Teachers Association', 'group', 'Term updates and collaborative student progression', 1)
 
   const insertChatMessage = db.prepare(`
-    INSERT INTO chat_messages (id, room_id, sender_id, sender_name, sender_role, sender_avatar, text, timestamp, reactions_json)
+    INSERT OR REPLACE INTO chat_messages (id, room_id, sender_id, sender_name, sender_role, sender_avatar, text, timestamp, reactions_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertChatMessage.run('msg-1', 'rm-staff-general', 'usr-princ-01', 'Dr. Chukwuemeka Eze (Principal)', 'Principal', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', 'Good morning faculty. Please ensure all mid-term CBT question banks and CA score weightages are collated by close of work today.', '08:45 AM', JSON.stringify({ '👍': 12, '✅': 8 }))
@@ -240,25 +304,25 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 13. Admissions Pipeline
   const insertCycle = db.prepare(`
-    INSERT INTO admission_cycles (id, tenant_id, title, target_classes_json, application_fee, currency, start_date, end_date, status, applicants_count, accepted_count)
+    INSERT OR REPLACE INTO admission_cycles (id, tenant_id, title, target_classes_json, application_fee, currency, start_date, end_date, status, applicants_count, accepted_count)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertCycle.run('adm-2026', 'apex-academy', '2026/2027 Academic Year Admissions', JSON.stringify(['JSS 1', 'JSS 2', 'SS 1']), 15000, 'NGN', '2026-01-10', '2026-08-30', 'Open', 142, 48)
 
   const insertApp = db.prepare(`
-    INSERT INTO admission_applications (id, cycle_id, applicant_name, applying_for_class, parent_name, parent_phone, parent_email, submission_date, entrance_exam_score, status, documents_json)
+    INSERT OR REPLACE INTO admission_applications (id, cycle_id, applicant_name, applying_for_class, parent_name, parent_phone, parent_email, submission_date, entrance_exam_score, status, documents_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertApp.run('app-001', 'adm-2026', 'Tobiloba Williams', 'JSS 1 Gold', 'Mr. Babatunde Williams', '+234 802 333 9988', 'babatunde.w@corp.ng', '2026-10-14', '88% (Pass)', 'Interview Scheduled', JSON.stringify(['Birth Certificate', 'Previous Term Report Card', 'Immunization Record']))
   insertApp.run('app-002', 'adm-2026', 'Zainab Danjuma', 'SS 1 Science', 'Col. Garba Danjuma', '+234 803 777 4422', 'danjuma.g@gov.ng', '2026-10-16', '94% (Distinction)', 'Offer Accepted', JSON.stringify(['Birth Certificate', 'Transcript', 'Character Testimonial']))
 
   // 14. Past Questions & Competitions
-  const insertPq = db.prepare(`INSERT INTO past_questions (id, exam_body, year, subject, total_questions, duration, description) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+  const insertPq = db.prepare(`INSERT OR REPLACE INTO past_questions (id, exam_body, year, subject, total_questions, duration, description) VALUES (?, ?, ?, ?, ?, ?, ?)`)
   insertPq.run('pq-waec-math-2024', 'WAEC WASSCE', 2024, 'General Mathematics', 50, '1 Hr 30 Mins', 'Official WAEC past question set featuring questions on quadratic graphs, circle geometry, trigonometry, and statistics.')
   insertPq.run('pq-jamb-phy-2025', 'JAMB UTME', 2025, 'Physics', 40, '1 Hour', 'Computer-Based Test simulation with timed speed drills, negative-marking toggle, and automated score projection.')
   insertPq.run('pq-igcse-chem-2025', 'Cambridge IGCSE', 2025, 'Chemistry (Extended)', 40, '45 Mins', 'Multiple-choice paper covering stoichiometry, organic chemistry, periodic trends, and titration calculations.')
 
-  const insertComp = db.prepare(`INSERT INTO competitions (id, title, category, organizer, current_round, participants_count, leaderboard_json) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+  const insertComp = db.prepare(`INSERT OR REPLACE INTO competitions (id, title, category, organizer, current_round, participants_count, leaderboard_json) VALUES (?, ?, ?, ?, ?, ?, ?)`)
   insertComp.run('comp-math-01', 'National Inter-School Mathematics Olympiad', 'Secondary STEM', 'National Mathematical Centre & Nwantas', 'Quarter-Finals (Live)', 420, JSON.stringify([
     { rank: 1, school: 'Apex International Academy', representative: 'Chidi Okonkwo', score: 98.4 },
     { rank: 2, school: 'Kingsway British College', representative: 'Oliver Davies', score: 96.8 },
@@ -273,7 +337,7 @@ export function seedInitialData(db: DatabaseSync) {
 
   // 15. Government Regulatory Compliance
   const insertGov = db.prepare(`
-    INSERT INTO government_compliance (id, tenant_id, accreditation_rating, last_audit_date, inspector_lead, curriculum_compliance, categories_json, citations_json)
+    INSERT OR REPLACE INTO government_compliance (id, tenant_id, accreditation_rating, last_audit_date, inspector_lead, curriculum_compliance, categories_json, citations_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `)
   insertGov.run(
