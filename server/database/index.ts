@@ -50,6 +50,73 @@ export const dbQuery = {
       subjects: JSON.parse(r.subjects_json || '[]')
     }))
   },
+  insertClass(cls: any) {
+    const db = getDatabase()
+    const id = cls.id || `cls-${cls.level.toLowerCase().replace(/\s+/g, '')}-${cls.arm.toLowerCase().replace(/\s+/g, '')}`
+    const displayName = cls.displayName || `${cls.level} ${cls.arm}`
+    db.prepare(`
+      INSERT INTO classes (id, tenant_id, level, arm, display_name, form_teacher, student_count, capacity, subjects_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      cls.tenantId || cls.tenant_id || 'apex-academy',
+      cls.level,
+      cls.arm,
+      displayName,
+      cls.formTeacher || '',
+      cls.studentCount || 0,
+      cls.capacity || 35,
+      JSON.stringify(cls.subjects || [])
+    )
+    return {
+      id,
+      tenantId: cls.tenantId || 'apex-academy',
+      level: cls.level,
+      arm: cls.arm,
+      displayName,
+      formTeacher: cls.formTeacher || '',
+      studentCount: cls.studentCount || 0,
+      capacity: cls.capacity || 35,
+      subjects: cls.subjects || []
+    }
+  },
+  updateClass(id: string, updates: any) {
+    const db = getDatabase()
+    const existing = db.prepare('SELECT * FROM classes WHERE id = ?').get(id) as any
+    if (!existing) return null
+
+    const level = updates.level ?? existing.level
+    const arm = updates.arm ?? existing.arm
+    const displayName = updates.displayName ?? `${level} ${arm}`
+    const formTeacher = updates.formTeacher ?? existing.form_teacher
+    const capacity = updates.capacity ?? existing.capacity
+    const subjects = updates.subjects ? JSON.stringify(updates.subjects) : existing.subjects_json
+
+    db.prepare(`
+      UPDATE classes
+      SET level = ?, arm = ?, display_name = ?, form_teacher = ?, capacity = ?, subjects_json = ?
+      WHERE id = ?
+    `).run(level, arm, displayName, formTeacher, capacity, subjects, id)
+
+    return {
+      id,
+      level,
+      arm,
+      displayName,
+      formTeacher,
+      capacity,
+      subjects: JSON.parse(subjects || '[]')
+    }
+  },
+  deleteClass(id: string) {
+    const db = getDatabase()
+    const studentCount = (db.prepare('SELECT count(*) as c FROM students WHERE class_arm_id = ?').get(id) as { c: number } | undefined)?.c || 0
+    if (studentCount > 0) {
+      throw new Error(`Cannot delete class arm with ${studentCount} active enrolled students. Please re-assign students first.`)
+    }
+    db.prepare('DELETE FROM classes WHERE id = ?').run(id)
+    return { success: true, id }
+  },
 
   // 4. Students
   getStudents(tenantId = 'apex-academy', classArmId?: string) {
@@ -106,6 +173,132 @@ export const dbQuery = {
         bed: r.hostel_bed
       } : undefined
     }
+  },
+  insertStudent(st: any) {
+    const db = getDatabase()
+    const id = st.id || `usr-stud-${Date.now().toString(36)}`
+    
+    let admissionNo = st.admissionNo
+    if (!admissionNo) {
+      const year = new Date().getFullYear()
+      const rand = Math.floor(100 + Math.random() * 900)
+      admissionNo = `APX-${year}-${rand}`
+    }
+
+    const defaultAvatar = st.gender === 'Female'
+      ? 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80'
+      : 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80'
+
+    db.prepare(`
+      INSERT INTO students (
+        id, tenant_id, admission_no, name, class_arm_id, class_arm_name,
+        gender, date_of_birth, guardian_name, guardian_phone, guardian_email,
+        guardian_relationship, guardian_photo, avatar, status, attendance_rate,
+        fee_status, fee_amount_due, hostel_building, hostel_room, hostel_bed
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      st.tenantId || st.schoolId || 'apex-academy',
+      admissionNo,
+      st.name,
+      st.classArmId,
+      st.classArmName,
+      st.gender || 'Male',
+      st.dateOfBirth || '2010-01-01',
+      st.guardianName || 'Guardian',
+      st.guardianPhone || '+234 800 000 0000',
+      st.guardianEmail || '',
+      st.guardianRelationship || 'Father',
+      st.guardianPhoto || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      st.avatar || defaultAvatar,
+      st.status || 'Active',
+      st.attendanceRate ?? 100.0,
+      st.feeStatus || 'Unpaid',
+      st.feeAmountDue ?? 0,
+      st.hostelInfo?.building || null,
+      st.hostelInfo?.room || null,
+      st.hostelInfo?.bed || null
+    )
+
+    this.syncClassStudentCount(st.classArmId)
+    return this.getStudentById(id)
+  },
+  updateStudent(id: string, updates: any) {
+    const db = getDatabase()
+    const existing = db.prepare('SELECT * FROM students WHERE id = ?').get(id) as any
+    if (!existing) return null
+
+    const oldClassArmId = existing.class_arm_id
+
+    db.prepare(`
+      UPDATE students SET
+        name = COALESCE(?, name),
+        class_arm_id = COALESCE(?, class_arm_id),
+        class_arm_name = COALESCE(?, class_arm_name),
+        gender = COALESCE(?, gender),
+        date_of_birth = COALESCE(?, date_of_birth),
+        guardian_name = COALESCE(?, guardian_name),
+        guardian_phone = COALESCE(?, guardian_phone),
+        guardian_email = COALESCE(?, guardian_email),
+        guardian_relationship = COALESCE(?, guardian_relationship),
+        guardian_photo = COALESCE(?, guardian_photo),
+        avatar = COALESCE(?, avatar),
+        status = COALESCE(?, status),
+        attendance_rate = COALESCE(?, attendance_rate),
+        fee_status = COALESCE(?, fee_status),
+        fee_amount_due = COALESCE(?, fee_amount_due),
+        hostel_building = COALESCE(?, hostel_building),
+        hostel_room = COALESCE(?, hostel_room),
+        hostel_bed = COALESCE(?, hostel_bed)
+      WHERE id = ?
+    `).run(
+      updates.name,
+      updates.classArmId,
+      updates.classArmName,
+      updates.gender,
+      updates.dateOfBirth,
+      updates.guardianName,
+      updates.guardianPhone,
+      updates.guardianEmail,
+      updates.guardianRelationship,
+      updates.guardianPhoto,
+      updates.avatar,
+      updates.status,
+      updates.attendanceRate,
+      updates.feeStatus,
+      updates.feeAmountDue,
+      updates.hostelInfo ? updates.hostelInfo.building : (updates.hostelBuilding ?? null),
+      updates.hostelInfo ? updates.hostelInfo.room : (updates.hostelRoom ?? null),
+      updates.hostelInfo ? updates.hostelInfo.bed : (updates.hostelBed ?? null),
+      id
+    )
+
+    if (updates.classArmId && updates.classArmId !== oldClassArmId) {
+      this.syncClassStudentCount(oldClassArmId)
+      this.syncClassStudentCount(updates.classArmId)
+    }
+
+    return this.getStudentById(id)
+  },
+  updateStudentStatus(id: string, status: string) {
+    const db = getDatabase()
+    db.prepare('UPDATE students SET status = ? WHERE id = ?').run(status, id)
+    return this.getStudentById(id)
+  },
+  deleteStudent(id: string) {
+    const db = getDatabase()
+    const existing = db.prepare('SELECT class_arm_id FROM students WHERE id = ?').get(id) as any
+    if (!existing) return null
+
+    db.prepare('DELETE FROM students WHERE id = ?').run(id)
+    this.syncClassStudentCount(existing.class_arm_id)
+    return { success: true, id }
+  },
+  syncClassStudentCount(classArmId: string) {
+    if (!classArmId) return
+    const db = getDatabase()
+    const count = (db.prepare("SELECT count(*) as c FROM students WHERE class_arm_id = ? AND status != 'Graduated'").get(classArmId) as { c: number } | undefined)?.c || 0
+    db.prepare('UPDATE classes SET student_count = ? WHERE id = ?').run(count, classArmId)
   },
 
   // 5. Lesson Notes
