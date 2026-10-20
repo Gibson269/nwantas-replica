@@ -1101,6 +1101,61 @@ export const dbQuery = {
     }
   },
 
+  allocateBed(bedId: string, studentId: string, studentName: string) {
+    const db = getDatabase()
+    const bed = db.prepare('SELECT * FROM hostel_beds WHERE id = ?').get(bedId) as any
+    if (!bed) return null
+
+    db.prepare(`
+      UPDATE hostel_beds
+      SET status = 'Occupied', student_id = ?, student_name = ?
+      WHERE id = ?
+    `).run(studentId, studentName, bedId)
+
+    // Update student's profile
+    db.prepare(`
+      UPDATE students
+      SET hostel_building = ?, hostel_room = ?, hostel_bed = ?
+      WHERE id = ?
+    `).run(bed.building_name, bed.room_number, bed.bed_code, studentId)
+
+    // Sync building occupancy count
+    const occ = (db.prepare("SELECT count(*) as c FROM hostel_beds WHERE building_id = ? AND status = 'Occupied'").get(bed.building_id) as any).c
+    const bld = db.prepare('SELECT total_beds FROM hostel_buildings WHERE id = ?').get(bed.building_id) as any
+    const vacant = Math.max(0, (bld?.total_beds || 0) - occ)
+    db.prepare('UPDATE hostel_buildings SET occupied_beds = ?, vacant_beds = ? WHERE id = ?').run(occ, vacant, bed.building_id)
+
+    return db.prepare('SELECT * FROM hostel_beds WHERE id = ?').get(bedId)
+  },
+
+  vacateBed(bedId: string) {
+    const db = getDatabase()
+    const bed = db.prepare('SELECT * FROM hostel_beds WHERE id = ?').get(bedId) as any
+    if (!bed) return null
+
+    if (bed.student_id) {
+      db.prepare(`
+        UPDATE students
+        SET hostel_building = NULL, hostel_room = NULL, hostel_bed = NULL
+        WHERE id = ?
+      `).run(bed.student_id)
+    }
+
+    db.prepare(`
+      UPDATE hostel_beds
+      SET status = 'Vacant', student_id = NULL, student_name = NULL
+      WHERE id = ?
+    `).run(bedId)
+
+    // Sync building occupancy count
+    const occ = (db.prepare("SELECT count(*) as c FROM hostel_beds WHERE building_id = ? AND status = 'Occupied'").get(bed.building_id) as any).c
+    const bld = db.prepare('SELECT total_beds FROM hostel_buildings WHERE id = ?').get(bed.building_id) as any
+    const vacant = Math.max(0, (bld?.total_beds || 0) - occ)
+    db.prepare('UPDATE hostel_buildings SET occupied_beds = ?, vacant_beds = ? WHERE id = ?').run(occ, vacant, bed.building_id)
+
+    return db.prepare('SELECT * FROM hostel_beds WHERE id = ?').get(bedId)
+  },
+
   // 10. Campus Gate Security & Exeats
   getExeats(tenantId = 'apex-academy') {
     const db = getDatabase()
@@ -1122,23 +1177,35 @@ export const dbQuery = {
   },
   insertExeat(exeat: any) {
     const db = getDatabase()
+    const id = exeat.id || `ext-${Date.now().toString(36)}`
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 16)
     db.prepare(`
       INSERT INTO exeats (id, tenant_id, student_id, student_name, class_arm, type, departure_time, expected_return, status, approved_by, guardian_pickup_name)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      exeat.id,
+      id,
       exeat.schoolId || exeat.tenant_id || 'apex-academy',
-      exeat.studentId,
+      exeat.studentId || 'usr-stud-01',
       exeat.studentName,
-      exeat.classArm,
-      exeat.type,
-      exeat.departureTime,
-      exeat.expectedReturn,
+      exeat.classArm || 'SS 2 Science',
+      exeat.type || 'Weekend Exeat',
+      exeat.departureTime || now,
+      exeat.expectedReturn || now,
       exeat.status || 'Approved',
-      exeat.approvedBy || 'Gate Control',
-      exeat.guardianPickupName
+      exeat.approvedBy || 'Dr. Chukwuemeka Eze (Principal)',
+      exeat.guardianPickupName || 'Authorized Guardian'
     )
-    return exeat
+    return db.prepare('SELECT * FROM exeats WHERE id = ?').get(id)
+  },
+  updateExeatStatus(id: string, status: string, actualReturn?: string) {
+    const db = getDatabase()
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 16)
+    db.prepare(`
+      UPDATE exeats
+      SET status = ?, actual_return = COALESCE(?, actual_return)
+      WHERE id = ?
+    `).run(status, actualReturn || (status === 'Returned' ? now : null), id)
+    return db.prepare('SELECT * FROM exeats WHERE id = ?').get(id)
   },
   getGuardianPickups(tenantId = 'apex-academy') {
     const db = getDatabase()

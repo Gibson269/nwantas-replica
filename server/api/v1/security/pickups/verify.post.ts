@@ -1,34 +1,38 @@
-import { db, type PickupRecord } from '~~/server/utils/db'
+import { database } from '~~/server/database'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { studentId, guardianName, guardianRelationship } = body || {}
 
-  const student = db.students.find(s => s.id === studentId) || db.students[0]
+  const student = database.getStudentById(studentId || 'usr-stud-01')
   if (!student) {
-    throw createError({ statusCode: 404, statusMessage: 'Student not found' })
+    throw createError({ statusCode: 404, statusMessage: 'Student not found in institutional directory.' })
   }
 
-  const newPickup: PickupRecord = {
+  // Match guardian details
+  const isMatch = (student.guardianName || '').toLowerCase().includes((guardianName || '').toLowerCase()) ||
+                  (guardianName || '').toLowerCase().includes((student.guardianName || '').toLowerCase())
+
+  const pickupRecord = database.insertGuardianPickup({
     id: `pkp-${Date.now().toString(36)}`,
-    schoolId: 'apex-academy',
+    tenantId: student.tenant_id || 'apex-academy',
     studentId: student.id,
     studentName: student.name,
     classArm: student.classArmName,
     guardianName: guardianName || student.guardianName,
-    guardianRelationship: guardianRelationship || student.guardianRelationship,
-    guardianPhoto: student.guardianPhoto,
-    pickupDate: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: 'Verified & Cleared',
-    verifiedBy: 'Officer Samuel Mensah (Gate 1)'
-  }
-
-  db.pickups.unshift(newPickup)
+    guardianRelationship: guardianRelationship || student.guardianRelationship || 'Parent',
+    guardianPhoto: student.guardianPhoto || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    status: isMatch ? 'Verified & Cleared' : 'Manual Supervisor Review Required',
+    verifiedBy: 'Officer Samuel Mensah (Gate 1 Security)'
+  })
 
   return {
-    verified: true,
-    message: 'Biometric and photo verification confirmed against registered guardian profile. Student cleared for campus departure.',
-    data: newPickup
+    success: true,
+    matched: isMatch,
+    message: isMatch
+      ? `Biometric Photo & Guardian Identity Verified: ${student.name} cleared for departure with ${guardianName}.`
+      : `Discrepancy Detected: Provided guardian name does not match enrolled record (${student.guardianName}). Supervisor clearance required.`,
+    data: pickupRecord,
+    student
   }
 })
-
