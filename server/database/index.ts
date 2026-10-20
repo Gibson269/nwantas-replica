@@ -958,6 +958,121 @@ export const dbQuery = {
     }
   },
 
+  getPayrollRuns(tenantId = 'apex-academy') {
+    const db = getDatabase()
+    const rows = db.prepare('SELECT * FROM payroll_runs WHERE tenant_id = ? ORDER BY month DESC').all(tenantId) as any[]
+    return rows.map(p => ({
+      id: p.id,
+      month: p.month,
+      totalStaff: p.total_staff,
+      grossSalary: p.gross_salary,
+      deductions: p.deductions,
+      netDisbursement: p.net_disbursement,
+      status: p.status,
+      disbursedDate: p.disbursed_date,
+      approvedBy: p.approved_by
+    }))
+  },
+
+  createPayrollRun(data: any) {
+    const db = getDatabase()
+    const id = data.id || `pr-${Date.now().toString(36)}`
+    const tenantId = data.tenantId || 'apex-academy'
+    const month = data.month || 'November 2026'
+    const totalStaff = Number(data.totalStaff) || 86
+    const grossSalary = Number(data.grossSalary) || 18450000
+    const deductions = Number(data.deductions) || 2150000
+    const netDisbursement = grossSalary - deductions
+
+    db.prepare(`
+      INSERT INTO payroll_runs (id, tenant_id, month, total_staff, gross_salary, deductions, net_disbursement, status, disbursed_date, approved_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, tenantId, month, totalStaff, grossSalary, deductions, netDisbursement, 'Ready for Review', null, null)
+
+    return db.prepare('SELECT * FROM payroll_runs WHERE id = ?').get(id)
+  },
+
+  disbursePayroll(id: string, approver = 'Chief Anthony Balogun (Owner)') {
+    const db = getDatabase()
+    const run = db.prepare('SELECT * FROM payroll_runs WHERE id = ?').get(id) as any
+    if (!run) return null
+
+    const today = new Date().toISOString().substring(0, 10)
+    db.prepare(`
+      UPDATE payroll_runs
+      SET status = 'Disbursed', disbursed_date = ?, approved_by = ?
+      WHERE id = ?
+    `).run(today, approver, id)
+
+    // Debit the central wallet balance
+    db.prepare(`
+      UPDATE tenants
+      SET wallet_balance = MAX(0, wallet_balance - ?)
+      WHERE id = ?
+    `).run(run.net_disbursement, run.tenant_id)
+
+    // Record disbursement transaction
+    const txId = `tx-${Date.now().toString(36)}`
+    db.prepare(`
+      INSERT INTO transactions (id, tenant_id, student_name, type, amount, channel, status, date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(txId, run.tenant_id, `Staff Payroll (${run.month})`, 'Payroll Salary Disbursement', run.net_disbursement, 'NIBSS NIP Bulk Transfer', 'Success', today)
+
+    return {
+      ...run,
+      status: 'Disbursed',
+      disbursedDate: today,
+      approvedBy: approver
+    }
+  },
+
+  createFeeSchedule(tenantId = 'apex-academy', data: any) {
+    const db = getDatabase()
+    const id = data.id || `fee-${Date.now().toString(36)}`
+    db.prepare(`
+      INSERT INTO fee_schedules (id, tenant_id, title, amount, category)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, tenantId, data.title, Number(data.amount) || 0, data.category || 'Mandatory')
+    return { id, tenantId, title: data.title, amount: Number(data.amount) || 0, category: data.category || 'Mandatory' }
+  },
+
+  deleteFeeSchedule(id: string) {
+    const db = getDatabase()
+    db.prepare('DELETE FROM fee_schedules WHERE id = ?').run(id)
+    return { success: true, id }
+  },
+
+  recordTransaction(data: any) {
+    const db = getDatabase()
+    const id = data.id || `tx-${Date.now().toString(36)}`
+    const tenantId = data.tenantId || 'apex-academy'
+    const today = data.date || new Date().toISOString().substring(0, 10)
+    const amount = Number(data.amount) || 0
+
+    db.prepare(`
+      INSERT INTO transactions (id, tenant_id, student_name, type, amount, channel, status, date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, tenantId, data.studentName, data.type || 'Tuition Fee Payment', amount, data.channel || 'Paystack Direct Debit', 'Success', today)
+
+    // Credit central wallet
+    db.prepare(`
+      UPDATE tenants
+      SET wallet_balance = wallet_balance + ?
+      WHERE id = ?
+    `).run(amount, tenantId)
+
+    return {
+      id,
+      tenantId,
+      studentName: data.studentName,
+      type: data.type || 'Tuition Fee Payment',
+      amount,
+      channel: data.channel || 'Paystack Direct Debit',
+      status: 'Success',
+      date: today
+    }
+  },
+
   // 9. Hostels & Beds
   getHostelBuildings(tenantId = 'apex-academy') {
     const db = getDatabase()
