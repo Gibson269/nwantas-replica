@@ -650,19 +650,28 @@ export const dbQuery = {
   },
 
   // 7. Broadsheet & Gradebook
-  getGradebook(tenantId = 'apex-academy', classArmId?: string) {
+  getGradebook(tenantId = 'apex-academy', classArmId?: string, subjectName?: string) {
     const db = getDatabase()
     let query = 'SELECT * FROM gradebook_entries WHERE tenant_id = ?'
     const params: any[] = [tenantId]
-    if (classArmId) {
+    if (classArmId && classArmId !== 'All') {
       query += ' AND class_arm_id = ?'
       params.push(classArmId)
     }
+    if (subjectName && subjectName !== 'All') {
+      query += ' AND subject_name = ?'
+      params.push(subjectName)
+    }
+    query += ' ORDER BY total_score DESC'
     const rows = db.prepare(query).all(...params) as any[]
     return rows.map(r => ({
+      id: r.id,
+      tenantId: r.tenant_id,
       studentId: r.student_id,
       studentName: r.student_name,
       admissionNo: r.admission_no,
+      classArmId: r.class_arm_id,
+      subjectName: r.subject_name,
       caScore: r.ca_score,
       midtermScore: r.midterm_score,
       examScore: r.exam_score,
@@ -673,6 +682,237 @@ export const dbQuery = {
       teacherRemarks: r.teacher_remarks,
       principalRemarks: r.principal_remarks
     }))
+  },
+
+  collateGradebook(tenantId = 'apex-academy', classArmId = 'cls-ss2-sci', subjectName?: string) {
+    const db = getDatabase()
+    let query = 'SELECT * FROM gradebook_entries WHERE tenant_id = ?'
+    const params: any[] = [tenantId]
+    if (classArmId && classArmId !== 'All') {
+      query += ' AND class_arm_id = ?'
+      params.push(classArmId)
+    }
+    if (subjectName && subjectName !== 'All') {
+      query += ' AND subject_name = ?'
+      params.push(subjectName)
+    }
+    query += ' ORDER BY (ca_score + midterm_score + exam_score) DESC'
+    const rows = db.prepare(query).all(...params) as any[]
+
+    const updateStmt = db.prepare(`
+      UPDATE gradebook_entries
+      SET total_score = ?, letter_grade = ?, gpa = ?, position = ?
+      WHERE id = ?
+    `)
+
+    const collated = rows.map((r, index) => {
+      const ca = Number(r.ca_score) || 0
+      const mid = Number(r.midterm_score) || 0
+      const ex = Number(r.exam_score) || 0
+      const total = Math.round((ca + mid + ex) * 10) / 10
+
+      let letter = 'F9'
+      let gpa = 0.0
+
+      if (total >= 75) { letter = 'A1'; gpa = 5.0 }
+      else if (total >= 70) { letter = 'B2'; gpa = 4.5 }
+      else if (total >= 65) { letter = 'B3'; gpa = 4.0 }
+      else if (total >= 60) { letter = 'C4'; gpa = 3.5 }
+      else if (total >= 55) { letter = 'C5'; gpa = 3.0 }
+      else if (total >= 50) { letter = 'C6'; gpa = 2.5 }
+      else if (total >= 45) { letter = 'D7'; gpa = 2.0 }
+      else if (total >= 40) { letter = 'E8'; gpa = 1.0 }
+
+      const position = index + 1
+      updateStmt.run(total, letter, gpa, position, r.id)
+
+      return {
+        id: r.id,
+        tenantId: r.tenant_id,
+        studentId: r.student_id,
+        studentName: r.student_name,
+        admissionNo: r.admission_no,
+        classArmId: r.class_arm_id,
+        subjectName: r.subject_name,
+        caScore: ca,
+        midtermScore: mid,
+        examScore: ex,
+        totalScore: total,
+        letterGrade: letter,
+        gpa,
+        position,
+        teacherRemarks: r.teacher_remarks,
+        principalRemarks: r.principal_remarks
+      }
+    })
+
+    const totalStudents = collated.length
+    const classAverage = totalStudents > 0
+      ? Math.round((collated.reduce((acc, c) => acc + c.totalScore, 0) / totalStudents) * 10) / 10
+      : 0
+    const passCount = collated.filter(c => c.totalScore >= 50).length
+    const passRate = totalStudents > 0 ? `${Math.round((passCount / totalStudents) * 100)}%` : '100%'
+
+    return {
+      success: true,
+      collatedAt: new Date().toISOString(),
+      classArmId,
+      subjectName,
+      summary: {
+        totalStudents,
+        classAverage,
+        highestScore: totalStudents > 0 ? collated[0].totalScore : 0,
+        lowestScore: totalStudents > 0 ? collated[totalStudents - 1].totalScore : 0,
+        passRate
+      },
+      data: collated
+    }
+  },
+
+  upsertGradebookEntry(entry: any) {
+    const db = getDatabase()
+    const id = entry.id || `gb-${Date.now().toString(36)}`
+    const tenantId = entry.tenantId || 'apex-academy'
+    const ca = Math.min(20, Math.max(0, Number(entry.caScore) || 0))
+    const midterm = Math.min(20, Math.max(0, Number(entry.midtermScore) || 0))
+    const exam = Math.min(60, Math.max(0, Number(entry.examScore) || 0))
+    const total = Math.round((ca + midterm + exam) * 10) / 10
+
+    let letter = 'F9'
+    let gpa = 0.0
+    if (total >= 75) { letter = 'A1'; gpa = 5.0 }
+    else if (total >= 70) { letter = 'B2'; gpa = 4.5 }
+    else if (total >= 65) { letter = 'B3'; gpa = 4.0 }
+    else if (total >= 60) { letter = 'C4'; gpa = 3.5 }
+    else if (total >= 55) { letter = 'C5'; gpa = 3.0 }
+    else if (total >= 50) { letter = 'C6'; gpa = 2.5 }
+    else if (total >= 45) { letter = 'D7'; gpa = 2.0 }
+    else if (total >= 40) { letter = 'E8'; gpa = 1.0 }
+
+    db.prepare(`
+      INSERT OR REPLACE INTO gradebook_entries (
+        id, tenant_id, student_id, student_name, admission_no, class_arm_id,
+        subject_name, ca_score, midterm_score, exam_score, total_score,
+        letter_grade, gpa, position, teacher_remarks, principal_remarks
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, tenantId, entry.studentId, entry.studentName, entry.admissionNo,
+      entry.classArmId, entry.subjectName, ca, midterm, exam, total,
+      letter, gpa, entry.position || 1, entry.teacherRemarks || 'Satisfactory academic performance.',
+      entry.principalRemarks || 'Approved.'
+    )
+
+    this.collateGradebook(tenantId, entry.classArmId, entry.subjectName)
+    return db.prepare('SELECT * FROM gradebook_entries WHERE id = ?').get(id)
+  },
+
+  getStudentTermReport(studentId: string, term = 'Second Term', session = '2026/2027') {
+    const db = getDatabase()
+    const student = this.getStudentById(studentId)
+    if (!student) return null
+
+    const tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(student.tenant_id || student.tenantId || 'apex-academy') as any
+
+    const subjects = db.prepare(`
+      SELECT * FROM gradebook_entries
+      WHERE student_id = ?
+      ORDER BY subject_name ASC
+    `).all(studentId) as any[]
+
+    const formattedSubjects = subjects.map(s => ({
+      subject: s.subject_name,
+      ca: s.ca_score,
+      caScore: s.ca_score,
+      midterm: s.midterm_score,
+      midtermScore: s.midterm_score,
+      exam: s.exam_score,
+      examScore: s.exam_score,
+      total: s.total_score,
+      totalScore: s.total_score,
+      grade: s.letter_grade,
+      letterGrade: s.letter_grade,
+      gpa: s.gpa,
+      position: s.position,
+      remarks: s.teacher_remarks,
+      teacherRemarks: s.teacher_remarks
+    }))
+
+    const totalMarks = formattedSubjects.reduce((acc, s) => acc + s.totalScore, 0)
+    const overallAverage = formattedSubjects.length > 0
+      ? Math.round((totalMarks / formattedSubjects.length) * 10) / 10
+      : 0
+    const overallGpa = formattedSubjects.length > 0
+      ? Math.round((formattedSubjects.reduce((acc, s) => acc + s.gpa, 0) / formattedSubjects.length) * 100) / 100
+      : 0
+
+    return {
+      school: {
+        name: tenant?.name || 'Apex International Academy',
+        motto: tenant?.motto || 'Excellence, Character & Global Leadership',
+        address: tenant?.address || 'Plot 14 Admiralty Way, Lekki Phase 1, Lagos State',
+        email: tenant?.email || 'admissions@apexacademy.edu.ng',
+        phone: tenant?.phone || '+234 1 800 2739',
+        crest: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150&auto=format&fit=crop&q=80'
+      },
+      student: {
+        id: student.id,
+        name: student.name,
+        admissionNo: student.admissionNo,
+        classArm: student.classArmName,
+        gender: student.gender,
+        avatar: student.avatar,
+        attendanceRate: student.attendanceRate,
+        guardianName: student.guardianName
+      },
+      termInfo: {
+        term,
+        session
+      },
+      session,
+      term,
+      subjects: formattedSubjects,
+      summary: {
+        totalSubjects: formattedSubjects.length,
+        totalScore: totalMarks,
+        totalMarks,
+        maxPossibleScore: formattedSubjects.length * 100,
+        maxPossibleMarks: formattedSubjects.length * 100,
+        average: `${overallAverage}%`,
+        averageScore: overallAverage,
+        overallGrade: overallAverage >= 75 ? 'A1 (Distinction)' : overallAverage >= 65 ? 'B (Merit)' : 'C (Credit)',
+        gpa: overallGpa,
+        classPosition: formattedSubjects.length > 0 ? `#${formattedSubjects[0].position}` : '#1',
+        classRank: formattedSubjects.length > 0 ? formattedSubjects[0].position : 1,
+        classTeacherRemark: 'A remarkably gifted, self-disciplined, and inquisitive scholar. Maintains consistency in STEM.',
+        classTeacherSignature: 'Mr. David Adeleke (B.Sc, PGDE)',
+        principalRemark: 'Outstanding academic distinction. Commendable intellectual and moral standard.',
+        principalSignature: 'Dr. Chukwuemeka Eze (Ph.D, FIM)',
+        attendancePercentage: `${student.attendanceRate}%`,
+        conduct: 'Exemplary',
+        nextTermBegins: 'January 11, 2027'
+      },
+      affectiveDomain: [
+        { trait: 'Punctuality & Regularity', rating: 5, remark: 'Always on time' },
+        { trait: 'Neatness & Decorum', rating: 5, remark: 'Impeccable grooming' },
+        { trait: 'Honesty & Integrity', rating: 5, remark: 'High moral integrity' },
+        { trait: 'Leadership & Initiative', rating: 4, remark: 'Proactive group contributor' },
+        { trait: 'Sportsmanship & Collaboration', rating: 4, remark: 'Excellent teamwork' }
+      ],
+      signatures: {
+        formTeacher: {
+          name: 'Mr. David Adeleke',
+          remark: 'A remarkably gifted, self-disciplined, and inquisitive scholar. Maintains consistency in STEM.',
+          signatureDate: '2026-10-19'
+        },
+        principal: {
+          name: 'Dr. Chukwuemeka Eze',
+          title: 'Principal & Academic Director',
+          remark: 'Outstanding academic distinction. Commendable intellectual and moral standard.',
+          approvedDate: '2026-10-19',
+          officialStamp: 'VERIFIED & CERTIFIED'
+        }
+      }
+    }
   },
 
   // 8. Wallets, Transactions, Fees & Payroll

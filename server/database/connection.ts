@@ -242,8 +242,21 @@ export function seedInitialData(db: DatabaseSync) {
     INSERT OR REPLACE INTO gradebook_entries (id, tenant_id, student_id, student_name, admission_no, class_arm_id, subject_name, ca_score, midterm_score, exam_score, total_score, letter_grade, gpa, position, teacher_remarks, principal_remarks)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
+  // Chidi Okonkwo (SS 2 Science)
   insertGrade.run('gb-001', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'APX-2023-084', 'cls-ss2-sci', 'Physics', 19, 18, 54, 91, 'A1', 5.0, 1, 'Exceptional mastery of physical concepts and mathematical reasoning.', 'Outstanding result. Keep sustaining this academic distinction.')
-  insertGrade.run('gb-002', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'Physics', 18, 17, 51, 86, 'A1', 5.0, 2, 'Brilliant analytical problem solver and active classroom contributor.', 'Commendable performance.')
+  insertGrade.run('gb-002', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'APX-2023-084', 'cls-ss2-sci', 'Mathematics', 20, 19, 56, 95, 'A1', 5.0, 1, 'Brilliant calculus and algebraic problem solving abilities.', 'Exemplary mathematical prowess.')
+  insertGrade.run('gb-003', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'APX-2023-084', 'cls-ss2-sci', 'Chemistry', 18, 17, 50, 85, 'A1', 5.0, 1, 'Strong comprehension of organic structures and stoichiometry.', 'Superb laboratory diligence.')
+  insertGrade.run('gb-004', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'APX-2023-084', 'cls-ss2-sci', 'English Language', 17, 16, 49, 82, 'A1', 5.0, 2, 'Eloquent spoken and written prose. High lexical repertoire.', 'Commendable literary standard.')
+  insertGrade.run('gb-005', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'APX-2023-084', 'cls-ss2-sci', 'Biology', 18, 18, 52, 88, 'A1', 5.0, 1, 'Detailed diagrams and accurate physiology classifications.', 'Top-tier analytical work.')
+  insertGrade.run('gb-006', 'apex-academy', 'usr-stud-01', 'Chidi Okonkwo', 'APX-2023-084', 'cls-ss2-sci', 'Civic Education', 19, 18, 53, 90, 'A1', 5.0, 1, 'Strong civic consciousness and leadership aptitude.', 'Distinguished moral character.')
+
+  // Amina Bello (SS 2 Science)
+  insertGrade.run('gb-011', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'Physics', 18, 17, 51, 86, 'A1', 5.0, 2, 'Brilliant analytical problem solver and active classroom contributor.', 'Commendable performance.')
+  insertGrade.run('gb-012', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'Mathematics', 19, 18, 52, 89, 'A1', 5.0, 2, 'Excellent geometrical and statistical analytical rigor.', 'Very strong aptitude.')
+  insertGrade.run('gb-013', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'Chemistry', 19, 18, 51, 88, 'A1', 5.0, 1, 'Exceptional laboratory accuracy and volumetric analysis.', 'Distinguished performance.')
+  insertGrade.run('gb-014', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'English Language', 19, 18, 54, 91, 'A1', 5.0, 1, 'Top essay writer in cohort. Outstanding comprehension depth.', 'Distinction grade awarded.')
+  insertGrade.run('gb-015', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'Biology', 17, 16, 48, 81, 'A1', 5.0, 2, 'Good grasp of genetics and ecology concepts.', 'Sustained diligence.')
+  insertGrade.run('gb-016', 'apex-academy', 'usr-stud-03', 'Amina Bello', 'APX-2023-042', 'cls-ss2-sci', 'Civic Education', 18, 17, 50, 85, 'A1', 5.0, 2, 'Thoughtful participation in national governance seminars.', 'Exemplary conduct.')
 
   // 9. Wallets, Transactions & Fee Schedules
   const insertFee = db.prepare(`INSERT OR REPLACE INTO fee_schedules (id, tenant_id, title, amount, category) VALUES (?, ?, ?, ?, ?)`)
